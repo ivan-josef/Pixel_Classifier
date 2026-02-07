@@ -12,13 +12,15 @@ class Pixel_Classifier:
         self.index_cls = 0
         self.list = []
         self.n_cls = 0
+        self.cls_flag = False 
         self.cls = []
         self.color = []
         self.classe = ''
         self.dict = {}
+        self.img_history = []
 
     def cls_creator(self):
-        self.n_cls = int(input(print('quantas classes voce vai marcar?: ')))
+        self.n_cls = int(input('quantas classes voce vai marcar?: '))
         a = 0
         b = 255
         for i in range(self.n_cls):
@@ -31,58 +33,73 @@ class Pixel_Classifier:
  
 
     def load_image(self):
-
         if self.index < 0:
             self.index = 0
         if self.index > len(self.files) -1 :
             self.index = len(self.files) - 1 
 
         self.complete_path = os.path.join(self.path,self.files[self.index])
-        self.img = cv2.imread(self.complete_path)
-        cv2.imshow(self.window,self.img)
+        self.img_raw = cv2.imread(self.complete_path)
+        self.img = self.img_raw.copy()
+        self.img_history = [] # zera o historico da imagem
         self.list = [] # zera a lista de pontos interminados ao mudar de img
+        cv2.imshow(self.window,self.img)
 
 
     def draw_polygone(self,event,x,y,flags,param):
         if event == cv2.EVENT_LBUTTONDOWN:
+            if len(self.list) == 0:
+                self.img_history.append(self.img.copy())
             self.list.append([x,y])
             cv2.circle(self.img,(x,y),3,self.color[self.index_cls])
             cv2.imshow(self.window,self.img)
+            self.cls_flag = False
 
         elif event == cv2.EVENT_RBUTTONDOWN:
             self.pts = np.array(self.list,np.int32)
             self.pts.reshape((-1, 1, 2))
-            self.getting_pixels(self.pts)
-            cv2.polylines(self.img,[self.pts],True,self.color[self.index_cls])
+            self.getting_pixels()
+            cv2.fillPoly(self.img,[self.pts],self.color[self.index_cls])
             cv2.imshow(self.window,self.img)
+            self.cls_flag = True
             self.list = []
     
 
-    def getting_pixels(self,pts): 
+    def getting_pixels(self): 
         self.mask = np.zeros(self.img.shape[:2],np.uint8)
-        cv2.fillPoly(self.mask,[pts],255)
+        cv2.fillPoly(self.mask,[self.pts],255)
         self.indices_y,self.indices_x = np.where(self.mask == 255)
-        self.cores_originais = self.img[self.indices_y,self.indices_x]
-        cv2.fillPoly(self.img,[pts],self.color[self.index_cls])
-        print(f'total de pixels {len(self.cores_originais)} da classe {self.classe}')
-        self.saving_pixels(self.cores_originais)
+        self.img_hsv = cv2.cvtColor(self.img_raw,cv2.COLOR_BGR2HSV)
+        self.cores_hsv = self.img_hsv[self.indices_y,self.indices_x]
+        print(f'{len(self.cores_hsv)} salvos na classe {self.classe}')
+        self.saving_pixels()
 
 
-    def saving_pixels(self,pts_tsave):
-        for key,value in self.dict.items():
-            if self.classe == key:
-                pass
-        print(self.dict)
-        
-
-    def deleting_pixels(self):
-        pass
+    def saving_pixels(self):
+        if self.classe in self.dict:
+            self.dict[self.classe].append(self.cores_hsv)
+        else:
+            print(f'Erro: classe: {self.classe} nao encontrada')
+    
+    
+    def deleting_pixel(self,pressed_key):
+        if pressed_key == ord('z'):
+            if self.classe in self.dict:
+                list_points = self.dict[self.classe]
+                if len(list_points) > 0:
+                    list_points.pop()
+                    print(f'poligono da classe {self.classe} removido')
+                    if len(self.img_history) > 0:
+                        self.img = self.img_history.pop()
+                        cv2.imshow(self.window,self.img)
+                else:
+                    print('vc nao possui nenhum ponto nessa lista')
         
 
     def change_class(self,teleop_key):
-        if teleop_key == ord('e'):
+        if teleop_key == ord('e') and self.cls_flag:
             self.index_cls +=1
-        elif teleop_key == ord('q'):
+        elif teleop_key == ord('q') and self.cls_flag:
             self.index_cls -=1
 
         if self.index_cls < 0:
@@ -122,16 +139,14 @@ class Pixel_Classifier:
                 self.change_class(self.key)
             #remove ultima marcação
             elif self.key == ord('z'):
-                self.deleting_pixels()
+                self.deleting_pixel(self.key)
+                
             #quebra do loop
             elif self.key == ord('w'):
-                print(self.classe)
                 break
 
         
-o = Pixel_Classifier('/home/ivan/color_segmentation/images_color_segmentation')
+o = Pixel_Classifier('/home/ivan/Pixel_Classifier/images_color_segmentation')
 o.run()
 cv2.destroyAllWindows()
 
-# problema 1: da pra fzr um polygono com pontos de classes diferentes 
-# problema 2: fzr com que as classes nao sejam hardcoded
