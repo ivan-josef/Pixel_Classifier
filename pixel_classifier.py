@@ -2,7 +2,7 @@ import cv2
 import os
 import numpy as np
 from random import randint
-
+import pandas as pd 
 
 class Pixel_Classifier:
 
@@ -21,6 +21,34 @@ class Pixel_Classifier:
         self.dict_pixels = {}
         self.dict_poly = {}
 
+    # this function is reponsible for saving the a .csv standard.
+    def save_dataset(self,file_name):
+        print('processing data')
+        data_frame = []
+
+        for name_class, array_hsv in self.dict_pixels.items():
+            if len(array_hsv) > 0:
+                packed_pixels = np.vstack(array_hsv) # Joining an array (50,3) with another (20,3) -> becomes (70,3)
+
+                df_temp = pd.DataFrame(packed_pixels,columns=['H','S','V'])
+
+                df_temp['class'] = name_class
+
+                data_frame.append(df_temp)
+                print(f'{len(df_temp)} pixels processed in the {name_class} class')
+
+        if len(data_frame) > 0:
+            df_final = pd.concat(data_frame,ignore_index=True)
+
+            archive_name = file_name
+            df_final.to_csv(archive_name,index=False)
+
+            print(f"\nfile '{archive_name}' saved.")
+            print("Data: ")
+            print(df_final.head()) 
+            print(df_final.tail()) 
+        else:
+            print("No data to save")
 
     # this function is responsible for creating classes and their respective dictionaires 
     # for storing pixels and polygons
@@ -50,8 +78,11 @@ class Pixel_Classifier:
 
         self.complete_path = os.path.join(self.path,self.files[self.index])
         self.img_raw = cv2.imread(self.complete_path)
-        self.list = [] # The list of points is emptied if you change the image.
+        # clear the dictionaries when you swap images
+        for k in self.dict_pixels: self.dict_pixels[k] = []
+        for k in self.dict_poly: self.dict_poly[k] = []
         self.refresh_screen()
+        self.list = [] # The list of points is emptied if you change the image.
 
 
     # This function is responsible for drawing polygons whenever an image or a polygon is deleted or drawed.
@@ -105,7 +136,7 @@ class Pixel_Classifier:
     # saves the pixels in their respective classes
     def saving_pixels(self):
         if self.classe in self.dict_pixels:
-            self.dict_pixels[self.classe].append(self.cores_hsv)
+            self.dict_pixels[self.classe].append(self.colors_hsv)
         else:
             print(f'Erro: classe: {self.classe} nao encontrada')
     
@@ -142,7 +173,14 @@ class Pixel_Classifier:
         
 
     def run(self):
-        print('Classificador de pixels 2000')
+        
+        print('Pixel classifier algorithm\n')
+        print('Press "A" and "D" to switch between images')
+        print('Use the left mouse button to draw a circle and define the polygon and right button to close the polygon')
+        print('"Q" and "E" to change the class')
+        print('"Z" to delete the last anotation of the class')
+        print('"W" to exit and save the table\n')
+              
         self.cls_creator()
 
         cv2.namedWindow(self.window)
@@ -150,7 +188,7 @@ class Pixel_Classifier:
 
         self.load_image()
 
-        print(f'CLASSE ATUAL: {self.classe}')
+        print(f'Current class: {self.classe}')
 
         while True:
             self.key = cv2.waitKey(0) & 0xFF
@@ -173,10 +211,15 @@ class Pixel_Classifier:
                 
             #quebra do loop
             elif self.key == ord('w'):
+                file_name = input('name for the .csv file: ') 
+                if '.csv' not in file_name:
+                    file_name = file_name + '.csv'
+                self.save_dataset(file_name)
                 break
 
-        
-o = Pixel_Classifier('/home/ivan/Pixel_Classifier/images_color_segmentation')
+                
+path = '/home/ivan/Pixel_Classifier/images_color_segmentation' # you nedd to add yout own path
+o = Pixel_Classifier(path)
 o.run()
 cv2.destroyAllWindows()
 
